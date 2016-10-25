@@ -1,0 +1,165 @@
+/*
+ * RetroV0.1: a text adveture game in a two node world. The user starts
+ * at node 0 (kauri tree) and needs to traverse the world using the 
+ * valid inputs of N, S, E, W via keyboard. The program reads in from
+ * the world text file (or another valid text file.
+ * 
+ * Author: Sara Dyson.
+ * 01/09/2016
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+#include <ctype.h>
+#include <stdbool.h>
+
+#define BUFFER_SIZE 500         // max node allowed
+#define PATH_SIZE 500           // max char length
+
+char validMove[] = { 'N', 'S', 'E', 'W' };
+
+char *placeName[] = { "North", "South", "East", "West" };       // mapped to valid move
+
+// declaration of the node structs
+
+typedef struct node_s Node;
+
+struct node_s {
+    char *nodeName;
+    // edges
+    int north;
+    int south;
+    int east;
+    int west;
+};
+
+
+// read one node from File
+void readOneNode(FILE * file, Node * newNode)
+{
+    // read from file and extract one node (destination) at a time.
+
+    char *buffer = malloc(BUFFER_SIZE);
+    fgets(buffer, BUFFER_SIZE, file);
+    newNode->nodeName = buffer;
+    newNode->north = -1;        // set to negative one: not a valid edge
+    newNode->south = -1;
+    newNode->east = -1;
+    newNode->west = -1;
+}
+
+// reading in all nodes
+void readNodes(FILE * file, Node * nodePool, int numOfNode)
+{
+    for (int i = 0; i < numOfNode; i++) {
+
+        readOneNode(file, &nodePool[i]);
+    }
+}
+
+// setting directions from each node
+int *map(char direction, Node * node)
+{
+    if (direction == 'N') {
+        return &node->north;
+    } else if (direction == 'S') {
+        return &node->south;
+    } else if (direction == 'E') {
+        return &node->east;
+    } else if (direction == 'W') {
+        return &node->west;
+    }
+    return NULL;
+}
+
+// connecting an edge between nodes
+void makeEdge(Node * nodePool, int index1, int index2, char dir1,
+              char dir2)
+{
+    *map(dir1, &nodePool[index1]) = index2;
+    *map(dir2, &nodePool[index2]) = index1;
+}
+
+//reading in the edges setting directions
+void readEdge(FILE * file, Node * nodeArray, int n)
+{
+    char line[PATH_SIZE];
+    int index1 = 0;
+    int index2 = 0;
+    char dir1 = 0;
+    char dir2 = 0;
+    for (int i = 0; i < n; i++) {
+        fgets(line, n, file);
+        sscanf(line, "%d %d %c %c", &index1, &index2, &dir1, &dir2);
+        makeEdge(nodeArray, index1, index2, dir1, dir2);
+    }
+}
+
+// checks if input is valid. Ignores invalid input.
+bool userInput(const char *input)
+{
+    bool valid = false;
+    if (strlen(input) != 2) {
+        return false;
+    } else {
+        int direction = input[0];
+        if (index(validMove, toupper(direction)) != NULL
+            || toupper(direction) == 'Q') {
+            valid = true;
+        }
+    }
+    return valid;
+}
+
+// traverse the graph and print location. Will also print if a move isn't valid 
+void traversal(Node * nodePool)
+{
+
+    Node currentNode = nodePool[0];
+    char input[BUFFER_SIZE] = "";
+    int move;
+    
+    fgets(input, BUFFER_SIZE, stdin);//reading in input via fgets
+    while ((strlen(input) == 2 && toupper(input[0]) != 'Q')
+           || (strlen(input) != 2)) {
+        if (userInput(input)) {
+            move = *map(toupper(input[0]), &currentNode);
+            char *direction =
+                placeName[index(validMove, toupper(input[0])) - validMove];
+            if (move == -1) {
+                printf("You can't go %s\n", direction);
+            } else {
+                currentNode = nodePool[move];
+                printf("%s to %s", direction, currentNode.nodeName);
+            }
+        }
+        fgets(input, BUFFER_SIZE, stdin);  //reading in via fgets
+    }
+    printf("Bye!");
+}
+
+
+int main(int argc, char *argv[])
+{
+    if (argc != 2) {
+        fprintf(stderr, "Missing or invalid world file.\n");
+    } else {
+        FILE *inputFile = fopen(argv[1], "r");
+        if (inputFile == NULL) {
+            fprintf(stderr, "Missing or invalid world file.\n");
+        } else {
+            char firstLine[100] = { '\0' };
+            fgets(firstLine, 100, inputFile);
+            int numNodes = 0;
+            int numEdges = 0;
+            Node nodePool[PATH_SIZE];
+            sscanf(firstLine, "%d %d", &numNodes, &numEdges);
+            readNodes(inputFile, nodePool, numNodes);
+            readEdge(inputFile, nodePool, PATH_SIZE);
+            printf("%s", nodePool[0].nodeName); // print the name of the starting node
+            traversal(nodePool);
+        }
+    }
+}
